@@ -178,6 +178,15 @@ def get_parent_doc_retriever(vectordb, persistent_parent_store):
     )
     print(f"docs in parent store: {len(list(store.yield_keys()))}")
     return retriever
+
+def get_parent_doc_retriever_with_reranker(vectordb, persistent_parent_store):
+    base_retriever = get_parent_doc_retriever(vectordb, persistent_parent_store)
+    # top_n is the number of documents to return after re-ranking
+    compressor = FlashrankRerank(model="ms-marco-MiniLM-L-12-v2", top_n=5)
+    compression_retriever = ContextualCompressionRetriever(
+        base_compressor=compressor, base_retriever=base_retriever
+    )
+    return compression_retriever
     
 def sanitise_filename(full_path_to_file):
     # replace all non-alphanumeric characters in the basename with underscores
@@ -228,12 +237,21 @@ def main(pdf, text, query, use_reranker, debug):
     print(naive_with_reranker_chain.invoke(query))
 
     ### store the parsed chunks in the vector store for parent document retrieval
-    print("\n\nPARENT DOCUMENT RETRIEVAL")
     parent_doc_rag_store_name = f"{naive_rag_store_name}_parent"
     child_chunk_db = VectorStore(parent_doc_rag_store_name)
     # https://stackoverflow.com/a/77397998
     persistent_parent_store = create_kv_docstore(LocalFileStore(f"{child_chunk_db.persistent_dir}/child_chunks"))
     load_vector_store_for_parent_document_retrieval(child_chunk_db, loader, persistent_parent_store)
+
+    print("\n\nPARENT DOCUMENT RETRIEVAL")
+    parent_doc_retrieval = RunnableParallel({"query": RunnablePassthrough(), "relevant_docs": get_parent_doc_retriever(child_chunk_db, persistent_parent_store)})
+    parent_doc_chain = parent_doc_retrieval | rag_prompt | llm | output_parser
+    print(parent_doc_chain.invoke(query))
+
+    print("\n\nPARENT DOCUMENT WITH RE-RANKER RETRIEVAL")
+    parent_doc_with_reranker_retrieval = RunnableParallel({"query": RunnablePassthrough(), "relevant_docs": get_parent_doc_retriever_with_reranker(child_chunk_db, persistent_parent_store)})
+    parent_doc_with_reranker_chain = parent_doc_with_reranker_retrieval | rag_prompt | llm | output_parser
+    print(parent_doc_with_reranker_chain.invoke(query))
     
 if __name__ == "__main__":
     main()
