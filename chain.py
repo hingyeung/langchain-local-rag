@@ -19,10 +19,25 @@ from langchain_core.runnables import RunnablePassthrough, RunnableParallel
 from langchain.globals import set_verbose, set_debug
 from langchain.storage._lc_store import create_kv_docstore
 from langchain.storage import LocalFileStore
+from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 db_dir = os.path.join(current_dir, "db")
-embeddings = OllamaEmbeddings(model="mxbai-embed-large:v1")
+# embedding model: mxbai-embed-large:v1
+# embeddings = OllamaEmbeddings(model="mxbai-embed-large:v1")
+#
+# https://huggingface.co/blog/langchain#huggingfaceembeddings
+# https://huggingface.co/spaces/mteb/leaderboard
+# downloaded models are in ~/.cache/huggingface/
+# embedding model: dunzhang/stella_en_1.5B_v5
+# embeddings = HuggingFaceEmbeddings(model_name="dunzhang/stella_en_1.5B_v5")
+#
+# embedding model: Alibaba-NLP/gte-large-en-v1.5
+# Loading Alibaba-NLP/gte-large-en-v1.5 requires you to execute the
+# configuration file in that repo on your local machine. Make sure 
+# you have read the code there to avoid malicious use, then set the 
+# option `trust_remote_code=True` to remove this error.
+embeddings = HuggingFaceEmbeddings(model_name="Alibaba-NLP/gte-large-en-v1.5", model_kwargs={"trust_remote_code": True})
 PRIMARY_CHUNK_SIZE = 1000
 PRIMARY_CHUNK_OVERLAP = 100
 CHILD_CHUNK_SIZE = 500
@@ -223,7 +238,7 @@ def main(pdf, text, query, use_reranker, debug):
     load_vector_store_for_naive_retrieval(naive_db, loader)
 
     rag_prompt = ChatPromptTemplate.from_template(PROMPT_TEMPLATE)
-    llm = ChatOllama(model="llama3", temperature=0)
+    llm = ChatOllama(model="llama3.1", temperature=0)
     output_parser = StrOutputParser()
     
     print("\n\nNAIVE RETRIEVAL")
