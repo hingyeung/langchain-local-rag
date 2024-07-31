@@ -1,3 +1,6 @@
+# https://www.youtube.com/watch?v=yF9kGESAi3M&list=WL&index=25
+# https://blog.gopenai.com/implementing-a-local-rag-with-langchain-and-llama3-a-quick-guide-1c0fe37341cc
+# https://www.reddit.com/r/LocalLLaMA/comments/1cqolrb/comment/l3tyeg9/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
 import click
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -146,9 +149,20 @@ def get_naive_retriever(vectordb, search_type="mmr", k=5, fetch_k=30, lambda_mul
     )
     
     retriever = vectordb.db.as_retriever(
+        ## similarity_score_threshold search type
+        # search_type="similarity_score_threshold",
+        # search_kwargs={"score_threshold": 0.1, "k": 2}
+
+        ## similarity search type
+        # search_type="similarity",
+        # search_kwargs={"k": 3}
+
+        ## mmr search type
         search_type="mmr",
         # If not using re-ranker, limit "k" to smaller value and rely on Chroma to
         # return the closest matches
+        # If using re-ranker, get more top matching docs from Chroma and give them
+        # to the re-ranker to re-rank to docs
         search_kwargs = {'k': k, 'fetch_k': fetch_k, 'lambda_mult': lambda_mult}
     )
     return retriever
@@ -246,7 +260,7 @@ def main(pdf, text, query, use_reranker, debug):
     naive_chain = naive_retrieval | rag_prompt | llm | output_parser
     print(naive_chain.invoke(query))
 
-    print("\n\nNAIVE WITH RE-RANKER RETRIEVAL")
+    print("\n\nNAIVE RETRIEVAL WITH RE-RANKER RETRIEVAL")
     naive_with_reranker_retrieval = RunnableParallel({"query": RunnablePassthrough(), "relevant_docs": get_naive_with_reranker_retriever(naive_db)})
     naive_with_reranker_chain = naive_with_reranker_retrieval | rag_prompt | llm | output_parser
     print(naive_with_reranker_chain.invoke(query))
